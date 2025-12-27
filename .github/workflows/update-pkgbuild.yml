@@ -41,6 +41,7 @@ jobs:
           LATEST_VERSION="${{ steps.latest_release.outputs.latest_version }}"
           CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
           FORCE="${{ github.event.inputs.force }}"
+          FORCE="${FORCE:-false}"
           if [ "$FORCE" = "true" ] || [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" != "$LATEST_VERSION" ]; then
             echo "update_needed=true" >> $GITHUB_OUTPUT
           else
