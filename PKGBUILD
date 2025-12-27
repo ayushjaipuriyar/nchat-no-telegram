@@ -3,7 +3,7 @@
 
 _pkgname="nchat-no-telegram"
 pkgname="$_pkgname"
-pkgver=
+pkgver=5.12.21
 pkgrel=1
 pkgdesc="Console-based chat client with support for Telegram"
 url="https://github.com/d99kris/nchat"
