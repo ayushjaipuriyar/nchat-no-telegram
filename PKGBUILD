@@ -1,7 +1,7 @@
 # Maintainer:
 # Contributor: Hoang Nguyen <toi at doclai dot com>
 
-_pkgname="nchat"
+_pkgname="nchat-no-telegram"
 pkgname="$_pkgname"
 pkgver=5.12.21
 pkgrel=1
