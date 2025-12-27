@@ -1,0 +1,90 @@
+name: Update PKGBUILD and Publish to AUR
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Run daily at midnight UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-pkgbuild:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Query GitHub for latest release
+        id: latest_release
+        run: |
+          RELEASE_INFO=$(curl -s https://api.github.com/repos/d99kris/nchat/releases/latest)
+          LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
+          LATEST_VERSION=${LATEST_TAG#v}  # Remove 'v' prefix if present
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get current PKGBUILD version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(grep '^pkgver=' PKGBUILD | cut -d'=' -f2)
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: compare
+        run: |
+          LATEST_VERSION="${{ steps.latest_release.outputs.latest_version }}"
+          CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
+          if [ "$(printf '%s\n' "$LATEST_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" != "$LATEST_VERSION" ]; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download new source and compute checksum
+        if: steps.compare.outputs.update_needed == 'true'
+        id: download
+        run: |
+          NEW_VERSION="${{ steps.latest_release.outputs.latest_version }}"
+          URL="https://github.com/d99kris/nchat/archive/refs/tags/v${NEW_VERSION}.tar.gz"
+          wget -O source.tar.gz "$URL"
+          SHA256=$(sha256sum source.tar.gz | cut -d' ' -f1)
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Update PKGBUILD
+        if: steps.compare.outputs.update_needed == 'true'
+        run: |
+          NEW_VERSION="${{ steps.latest_release.outputs.latest_version }}"
+          SHA256="${{ steps.download.outputs.sha256 }}"
+          sed -i "s/^pkgver=.*/pkgver=$NEW_VERSION/" PKGBUILD
+          sed -i "s/sha256sums=.*/sha256sums=('$SHA256')/" PKGBUILD
+
+      - name: Commit and push changes to GitHub
+        if: steps.compare.outputs.update_needed == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add PKGBUILD
+          git commit -m "Update to version ${{ steps.latest_release.outputs.latest_version }}"
+          git push
+
+      - name: Create GitHub Release
+        if: steps.compare.outputs.update_needed == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.latest_release.outputs.latest_version }}
+          name: Release v${{ steps.latest_release.outputs.latest_version }}
+          body: Updated PKGBUILD to nchat version ${{ steps.latest_release.outputs.latest_version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish AUR Package
+        if: steps.compare.outputs.update_needed == 'true'
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        with:
+          pkgname: nchat
+          pkgbuild: ./PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to version ${{ steps.latest_release.outputs.latest_version }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
