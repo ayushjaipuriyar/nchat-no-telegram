@@ -81,10 +81,6 @@ jobs:
         if: steps.compare.outputs.update_needed == 'true'
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
         with:
-          pkgname: nchat
-          pkgbuild: ./PKGBUILD
-          commit_username: ${{ secrets.AUR_USERNAME }}
-          commit_email: ${{ secrets.AUR_EMAIL }}
-          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        pkgname: nchat-no-telegram
           commit_message: Update to version ${{ steps.latest_release.outputs.latest_version }}
           ssh_keyscan_types: rsa,ecdsa,ed25519
